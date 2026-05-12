@@ -19,7 +19,7 @@ pub(crate) fn try_read_static_file(url_path: &str) -> Option<(String, Vec<u8>)> 
     // Files are vendored under bridge/static.
     // URL layout expected by the dashboard:
     // - / -> index.html
-    // - /trends.html, /blocks.html, /workers.html, /node.html (dashboard sections)
+    // - /trends.html, /blocks.html, /workers.html, /node.html, /metrics.html, /session-charts.html (dashboard sections)
     // - /raw.html
     // - /static/... -> maps to bridge/static/... (strip leading /static/)
     let rel = match url_path {
@@ -29,6 +29,8 @@ pub(crate) fn try_read_static_file(url_path: &str) -> Option<(String, Vec<u8>)> 
         "/blocks.html" => "blocks.html".to_string(),
         "/workers.html" => "workers.html".to_string(),
         "/node.html" => "node.html".to_string(),
+        "/metrics.html" => "metrics.html".to_string(),
+        "/session-charts.html" => "session-charts.html".to_string(),
         "/raw.html" => "raw.html".to_string(),
         p if p.starts_with("/static/") => p.trim_start_matches("/static/").to_string(),
         _ => return None,

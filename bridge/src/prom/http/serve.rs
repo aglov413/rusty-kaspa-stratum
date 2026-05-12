@@ -106,7 +106,7 @@ pub(crate) async fn handle_http_request(
     let path = path.split('?').next().unwrap_or(path);
     let path = path.split('#').next().unwrap_or(path);
 
-    if request.starts_with("GET /metrics") {
+    if request.starts_with("GET /") && path == "/metrics" {
         use prometheus::Encoder;
         let encoder = prometheus::TextEncoder::new();
         let metric_families = match mode {
