@@ -347,6 +347,7 @@ impl ShareHandler {
                 let mut total_invalids: i64 = 0;
                 let mut total_blocks: i64 = 0;
                 let mut total_blocks_all_time: i64 = 0;
+                let mut active_worker_count: usize = 0;
 
                 let now = Instant::now();
                 let start = entries
@@ -389,6 +390,7 @@ impl ShareHandler {
 
                         // Sum blocks from individual workers for "Blocks" column (online workers only)
                         total_blocks += blocks;
+                        active_worker_count += 1;
 
                         let spm = if elapsed > 0.0 {
                             (shares as f64) / (elapsed / 60.0)
@@ -584,10 +586,10 @@ impl ShareHandler {
                     total_blocks_all_time += blocks; // Also add to all-time total for the "Total" column
                 }
 
-                let overall_spm = average_worker_spm(total_worker_spm, total_worker_count);
+                let avg_spm = average_worker_spm(total_worker_spm, total_worker_count);
                 let total_spm_tgt = match total_target {
-                    Some(t) => format!("{:>4.1}/{:<4.1}", overall_spm, t),
-                    None => format!("{:>4.1}/-", overall_spm),
+                    Some(t) => format!("{:>4.1}/{:<4.1}", avg_spm, t),
+                    None => format!("{:>4.1}/-", avg_spm),
                 };
 
                 out.push(format!(
