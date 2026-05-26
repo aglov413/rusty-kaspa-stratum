@@ -21,6 +21,8 @@ pub struct WorkStats {
     pub var_diff_shares_found: Arc<Mutex<i64>>,
     pub var_diff_window: Arc<Mutex<usize>>,
     pub min_diff: Arc<Mutex<f64>>,
+    /// Counts how many forced-drops have fired for this worker (capped at 2, first minute only).
+    pub forced_drop_count: Arc<Mutex<u32>>,
 }
 
 impl WorkStats {
@@ -38,6 +40,7 @@ impl WorkStats {
             var_diff_shares_found: Arc::new(Mutex::new(0)),
             var_diff_window: Arc::new(Mutex::new(0)),
             min_diff: Arc::new(Mutex::new(0.0)),
+            forced_drop_count: Arc::new(Mutex::new(0)),
         }
     }
 }
