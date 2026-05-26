@@ -1,8 +1,8 @@
 use super::ShareHandler;
 use super::duplicate_submit::DuplicateSubmitGuard;
 use super::vardiff::{
-    VAR_DIFF_THREAD_SLEEP, VARDIFF_NO_VALID_SHARE_SECS, vardiff_compute_next_diff,
-    vardiff_forced_drop,
+    VAR_DIFF_THREAD_SLEEP, VARDIFF_FORCED_DROP_MAX, VARDIFF_NO_VALID_SHARE_SECS,
+    vardiff_compute_next_diff, vardiff_forced_drop,
 };
 #[cfg(feature = "rkstratum_cpu_miner")]
 use super::work_stats::RKSTRATUM_CPU_MINER_METRICS;
@@ -671,23 +671,36 @@ impl ShareHandler {
                     let start_opt = *v.var_diff_start_time.lock();
                     let Some(start) = start_opt else { continue };
 
-                    // Forced drop: if no valid share has been received within the absolute
-                    // timeout, drop diff immediately regardless of window state.
-                    // last_share is only updated on accepted shares (not stales/invalids),
-                    // so this reliably catches miners stuck at a difficulty too high to hit.
+                    // Forced drop: active only within the first 60s of a worker's session,
+                    // fires when no valid share has been received for VARDIFF_NO_VALID_SHARE_SECS
+                    // (20s), max VARDIFF_FORCED_DROP_MAX (2) times total.
+                    // last_share is only updated on accepted shares (not stales/invalids).
+                    let session_secs = now.duration_since(v.start_time).as_secs_f64();
                     let secs_since_last_share =
                         now.duration_since(*v.last_share.lock()).as_secs_f64();
-                    if secs_since_last_share >= VARDIFF_NO_VALID_SHARE_SECS {
+                    let drop_count = *v.forced_drop_count.lock();
+                    if session_secs < 60.0
+                        && drop_count < VARDIFF_FORCED_DROP_MAX
+                        && secs_since_last_share >= VARDIFF_NO_VALID_SHARE_SECS
+                    {
                         let current = *v.min_diff.lock();
+                        let worker = v.worker_name.lock().clone();
                         if let Some(next) = vardiff_forced_drop(current, clamp) {
                             *v.min_diff.lock() = next;
                             if log_stats {
                                 info!(
-                                    "{} VarDiff forced drop: no valid share for {:.0}s, diff {:.0} -> {:.0}",
-                                    prefix, secs_since_last_share, current, next
+                                    "{} VarDiff forced drop [{}/{}]: worker={} no valid share for {:.0}s, diff {:.0} -> {:.0}",
+                                    prefix,
+                                    drop_count + 1,
+                                    VARDIFF_FORCED_DROP_MAX,
+                                    worker,
+                                    secs_since_last_share,
+                                    current,
+                                    next
                                 );
                             }
                         }
+                        *v.forced_drop_count.lock() += 1;
                         // Always reset window and skip normal logic for this tick.
                         *v.var_diff_start_time.lock() = Some(now);
                         *v.var_diff_shares_found.lock() = 0;
