@@ -179,7 +179,7 @@ pub(crate) async fn send_immediate_job_task<T: KaspaApiTrait + Send + Sync + ?Si
     // brief connection blip does not force the miner back to the starting difficulty.
     // Falls back to min_diff for genuinely new workers (no prior stats).
     let existing_diff = share_handler.get_client_vardiff(&client_clone);
-    let effective_min_diff = if existing_diff > min_diff {
+    let effective_min_diff = if existing_diff > 0.0 {
         debug!(
             "send_immediate_job: reconnect detected for {} — restoring last diff {:.0} (instance min {:.0})",
             client_clone.remote_addr, existing_diff, min_diff
