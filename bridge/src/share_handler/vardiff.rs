@@ -103,16 +103,17 @@ pub(crate) fn vardiff_compute_next_diff(
         return None;
     }
 
-    // Dead band expands symmetrically the longer the miner has been stable.
-    // Every 30s past the minimum window adds ±5%, capped at ±15% extra (after 120s).
+    // Dead band expands on the lower side only — gives stable miners more tolerance before
+    // stepping down, without suppressing step-up.  Upper bound stays fixed so a miner
+    // consistently over target always triggers within one window.
     //   elapsed=30s:  [0.75 – 1.25]
-    //   elapsed=60s:  [0.70 – 1.30]
-    //   elapsed=90s:  [0.65 – 1.35]
-    //   elapsed=120s+:[0.60 – 1.40]
+    //   elapsed=60s:  [0.70 – 1.25]
+    //   elapsed=90s:  [0.65 – 1.25]
+    //   elapsed=120s+:[0.60 – 1.25]
     let extra = ((elapsed_secs - VARDIFF_MIN_ELAPSED_SECS) / 30.0)
         .clamp(0.0, 3.0) * 0.05;
     let lower = VARDIFF_LOWER_RATIO - extra;
-    let upper = VARDIFF_UPPER_RATIO + extra;
+    let upper = VARDIFF_UPPER_RATIO;
     if ratio > lower && ratio < upper {
         return None;
     }
@@ -160,15 +161,29 @@ mod tests {
     }
 
     #[test]
-    fn no_change_when_ratio_in_expanded_band() {
-        // At elapsed=90s extra=0.10 → band [0.65, 1.35].
-        // 3 shares in 30s at target 5 SPM → ratio = 12/5 = 2.4 → above 1.35 → triggers.
-        // But ratio=0.70 (just inside expanded lower): 3 shares/30s=6 SPM, target≈8.57 → ratio≈0.70
-        // Use a scenario clearly inside the expanded band: ratio=0.68 is below 0.65 lower (triggers).
-        // Simpler: ratio=1.30 just inside [0.65,1.35] at elapsed=90s → None.
-        // 3 shares in 30s = 6 SPM, target = 6/1.30 ≈ 4.615 SPM → ratio = 1.30
-        let target = 6.0 / 1.30;
-        assert!(vardiff_compute_next_diff(64.0, 3.0, 30.0, target, false).is_none());
+    fn no_change_when_ratio_in_expanded_lower_band() {
+        // Lower band expands to 0.65 at elapsed=90s (upper stays fixed at 1.25).
+        // ratio=0.70 is between 0.65 (expanded lower) and 0.75 (base lower) → no change at 90s.
+        // 7 shares in 90s = 4.667 SPM, target = 4.667 / 0.70 ≈ 6.667 → ratio ≈ 0.70
+        let target_90 = (7.0_f64 / 90.0 * 60.0) / 0.70;
+        assert!(
+            vardiff_compute_next_diff(64.0, 7.0, 90.0, target_90, false).is_none(),
+            "ratio=0.70 inside expanded lower band at 90s should not adjust"
+        );
+
+        // Same ratio at elapsed=30s → lower=0.75, 0.70 < 0.75 → outside band → should adjust.
+        let target_30 = (3.0_f64 / 30.0 * 60.0) / 0.70;
+        assert!(
+            vardiff_compute_next_diff(64.0, 3.0, 30.0, target_30, false).is_some(),
+            "ratio=0.70 below base lower band at 30s should adjust"
+        );
+
+        // Upper bound is fixed: ratio=1.30 triggers at 90s (NOT suppressed by expansion).
+        let target_up = (3.0_f64 / 30.0 * 60.0) / 1.30;
+        assert!(
+            vardiff_compute_next_diff(64.0, 3.0, 90.0, target_up, false).is_some(),
+            "ratio=1.30 should trigger step-up at 90s (upper bound fixed at 1.25)"
+        );
     }
 
     #[test]
@@ -214,10 +229,10 @@ mod tests {
         assert!(vardiff_compute_next_diff(64.0, 3.0, 30.0, t, false).is_none(),
             "ratio just inside base band at 30s should not adjust");
 
-        // At elapsed=120s (extra=0.15): band is [0.60, 1.40].
-        // Same ratio ~0.76 is now well inside the expanded band → still no change.
+        // At elapsed=120s (extra=0.15): band is [0.60, 1.25] (lower expanded, upper fixed).
+        // Same ratio ~0.76 is inside [0.60, 1.25] → still no change.
         assert!(vardiff_compute_next_diff(64.0, 3.0, 120.0, t, false).is_none(),
-            "same ratio inside expanded band at 120s should not adjust");
+            "same ratio inside expanded lower band at 120s should not adjust");
 
         // ratio=0.58 is below the 120s lower bound (0.60) → should adjust.
         let t2 = 6.0 / 0.58;
