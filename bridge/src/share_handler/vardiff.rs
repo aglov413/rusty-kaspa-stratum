@@ -16,13 +16,17 @@ const VARDIFF_MAX_STEP_DOWN: f64 = 0.5; // 1 pow2 step down per tick (e.g. 512 �
 /// 0.25 = 2 pow2 steps down per drop — more aggressive than normal vardiff step.
 const VARDIFF_FORCED_DROP_MULTIPLIER: f64 = 0.25;
 
-/// Absolute no-valid-share timeout for the early forced-drop path (first 60s only).
-/// At 20 SPM target (3s expected interval), 20s without a valid share means the miner
-/// is producing < 3 SPM — diff is clearly too high for a newly-connected miner.
-pub(crate) const VARDIFF_NO_VALID_SHARE_SECS: f64 = 20.0;
+/// Absolute no-valid-share timeout for the early forced-drop path (first 120s only).
+/// 60s without a valid share gives even a large miner at a high starting diff (e.g. 16384)
+/// a full minute to find its first share before the drop fires.
+pub(crate) const VARDIFF_NO_VALID_SHARE_SECS: f64 = 60.0;
 
 /// Maximum number of forced drops allowed per worker (within the first 60s only).
-pub(crate) const VARDIFF_FORCED_DROP_MAX: u32 = 2;
+/// One drop (2 pow2 steps via VARDIFF_FORCED_DROP_MULTIPLIER) is enough to unblock a
+/// genuinely idle miner from an unreachable starting diff (e.g. 16384 → 4096).
+/// Normal vardiff takes over from there for further calibration.  Capping at 1 avoids
+/// over-shooting for large miners that were simply slow to produce their first share.
+pub(crate) const VARDIFF_FORCED_DROP_MAX: u32 = 1;
 
 fn vardiff_pow2_clamp_towards(current: f64, next: f64) -> f64 {
     if !next.is_finite() || next <= 0.0 {

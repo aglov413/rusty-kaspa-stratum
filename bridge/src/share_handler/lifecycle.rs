@@ -681,7 +681,7 @@ impl ShareHandler {
                     let secs_since_last_share =
                         now.duration_since(*v.last_share.lock()).as_secs_f64();
                     let drop_count = *v.forced_drop_count.lock();
-                    if session_secs < 60.0
+                    if session_secs < 120.0
                         && drop_count < VARDIFF_FORCED_DROP_MAX
                         && secs_since_last_share >= VARDIFF_NO_VALID_SHARE_SECS
                     {
