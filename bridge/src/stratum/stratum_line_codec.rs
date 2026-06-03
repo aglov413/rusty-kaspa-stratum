@@ -1,6 +1,21 @@
 //! Line-oriented framing for Stratum over TCP: strip NULs, accumulate bytes, split on `\n`.
 //! Extracted for unit tests without spinning a full listener.
 
+/// Maximum permitted size (in bytes) for an incomplete Stratum line awaiting `\n`.
+/// Legitimate JSON-RPC Stratum messages are well below this; the cap prevents unbounded
+/// memory growth when a client sends data without a newline.
+pub const MAX_STRATUM_LINE_BYTES: usize = 64 * 1024;
+
+/// Append received data to the line buffer. Returns `false` if the append would exceed
+/// [`MAX_STRATUM_LINE_BYTES`], leaving the buffer unchanged.
+pub fn append_line_data(line_buffer: &mut String, data: &str) -> bool {
+    if line_buffer.len().saturating_add(data.len()) > MAX_STRATUM_LINE_BYTES {
+        return false;
+    }
+    line_buffer.push_str(data);
+    true
+}
+
 /// Remove embedded NUL bytes (some firmware sends them between messages).
 pub fn strip_nul_bytes(bytes: &[u8]) -> Vec<u8> {
     bytes.iter().copied().filter(|&b| b != 0).collect()
@@ -70,5 +85,19 @@ mod tests {
         assert!(!line_looks_like_http(
             "{\"jsonrpc\":\"2.0\",\"method\":\"mining.subscribe\"}"
         ));
+    }
+
+    #[test]
+    fn append_line_data_accepts_data_under_limit() {
+        let mut buf = String::new();
+        assert!(append_line_data(&mut buf, "{\"jsonrpc\":\"2.0\"}\n"));
+        assert_eq!(buf, "{\"jsonrpc\":\"2.0\"}\n");
+    }
+
+    #[test]
+    fn append_line_data_rejects_when_limit_exceeded() {
+        let mut buf = "x".repeat(MAX_STRATUM_LINE_BYTES);
+        assert!(!append_line_data(&mut buf, "y"));
+        assert_eq!(buf.len(), MAX_STRATUM_LINE_BYTES);
     }
 }

@@ -10,6 +10,7 @@ Other files in `docs/`:
 | --- | --- |
 | [CONFIGURATION.md](CONFIGURATION.md) | YAML keys, defaults, CLI overrides, multi-instance notes |
 | [PACKAGING.md](PACKAGING.md) | Workspace layout, AppImage, Tauri paths |
+| [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md) | How to sync `bridge/` and Kaspa deps from LiveLaughLove13/rusty-kaspa (Toccata / future forks) |
 
 The repository **[README.md](../README.md)** covers cloning, CI release artifacts, and quick start. A **container** build lives at the repo root **[`Dockerfile`](../Dockerfile)** (not documented in duplicate elsewhere—see `CONFIGURATION.md` packaging section).
 

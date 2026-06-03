@@ -687,7 +687,6 @@ pub fn init_worker_counters(worker: &WorkerContext) {
 /// Does not refresh dashboard activity — jobs alone must not keep 0-share workers "online".
 pub fn update_worker_difficulty(worker: &WorkerContext, difficulty: f64) {
     init_worker_counter_series(worker);
-
     if let Some(gauge) = WORKER_CURRENT_DIFFICULTY.get() {
         gauge.with_label_values(&worker.labels()).set(difficulty);
     }

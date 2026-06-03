@@ -1,6 +1,6 @@
 # Stratum Bridge
 
-This repository tracks **kaspanet/rusty-kaspa**’s [`bridge/`](https://github.com/kaspanet/rusty-kaspa/tree/master/bridge) crate layout: Rust sources and `static/` live under **`bridge/`**, built as package `kaspa-stratum-bridge` from the workspace root.
+This repository tracks **LiveLaughLove13/rusty-kaspa** (Toccata-ready) [`bridge/`](https://github.com/LiveLaughLove13/rusty-kaspa/tree/master/bridge) crate layout: Rust sources and `static/` live under **`bridge/`**, built as package `kaspa-stratum-bridge` from the workspace root.
 
 Binary name:
 
@@ -89,6 +89,10 @@ Headless **CLI** releases can also be packaged as an AppImage (same scripts as [
 The **Tauri** desktop shell (“bridge GUI”) lives under [`bridge-tauri/`](bridge-tauri/). It embeds the local **`bridge/`** crate (`kaspa-stratum-bridge`) via a path dependency (`bridge-tauri/src-tauri/Cargo.toml`). It does not replace the standalone `stratum-bridge` CLI binary above.
 
 See [`bridge-tauri/README.md`](bridge-tauri/README.md) and [`docs/PACKAGING.md`](docs/PACKAGING.md) for build commands and layout.
+
+## Maintainers: upstream sync
+
+When pulling new bridge or consensus changes from [LiveLaughLove13/rusty-kaspa](https://github.com/LiveLaughLove13/rusty-kaspa), follow [`docs/UPSTREAM_SYNC.md`](docs/UPSTREAM_SYNC.md) (do not overwrite this repo’s modular `bridge/` layout with the monorepo tree).
 
 ## 🤝 Contributing
 

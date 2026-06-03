@@ -295,7 +295,17 @@ pub(crate) async fn spawn_client_listener(
                 }
 
                 let chunk = String::from_utf8_lossy(&data);
-                let drained = push_lossy_and_drain_lines(&mut line_buffer, &chunk);
+                if !crate::stratum_line_codec::append_line_data(&mut line_buffer, &chunk) {
+                    warn!(
+                        "[CONNECTION] Client {}:{} exceeded maximum Stratum line size ({} bytes), disconnecting",
+                        ctx.remote_addr,
+                        ctx.remote_port,
+                        crate::stratum_line_codec::MAX_STRATUM_LINE_BYTES
+                    );
+                    ctx.disconnect();
+                    break;
+                }
+                let drained = push_lossy_and_drain_lines(&mut line_buffer, "");
 
                 for line in drained {
                     // Get client context for detailed logging

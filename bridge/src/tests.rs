@@ -2096,6 +2096,8 @@ mod comprehensive_tests {
         // Test: VarDiff difficulty management
         let handler = ShareHandler::new("test-instance".to_string());
         let ctx = create_test_context_sync();
+        ctx.identity.lock().wallet_addr = "kaspatest:test".to_string();
+        handler.get_create_stats(&ctx);
 
         handler.get_create_stats(&ctx);
 
@@ -2115,6 +2117,28 @@ mod comprehensive_tests {
             4096.0,
             "New diff should be 4096"
         );
+    }
+
+    #[test]
+    fn test_set_client_vardiff_does_not_recreate_pruned_stats() {
+        let handler = ShareHandler::new("test-instance".to_string());
+        let ctx = create_test_context_sync();
+        ctx.identity.lock().wallet_addr = "kaspatest:test".to_string();
+        ctx.identity.lock().worker_name = "rig-1".to_string();
+        handler.get_create_stats(&ctx);
+        handler.set_client_vardiff(&ctx, 8192.0);
+        assert_eq!(handler.get_client_vardiff(&ctx), 8192.0);
+
+        handler.test_clear_stats();
+        handler.set_client_vardiff(&ctx, 4096.0);
+        assert_eq!(handler.test_stats_len(), 0);
+    }
+
+    #[test]
+    fn test_total_row_spm_uses_worker_average() {
+        use crate::share_handler::average_worker_spm;
+        assert!((average_worker_spm(30.0, 3) - 10.0).abs() < f64::EPSILON);
+        assert_eq!(average_worker_spm(0.0, 0), 0.0);
     }
 
     // ========================================================================
@@ -2153,6 +2177,8 @@ mod comprehensive_tests {
         // This test verifies the ShareHandler can manage VarDiff
         let handler = ShareHandler::new("test-instance".to_string());
         let ctx = create_test_context_sync();
+        ctx.identity.lock().wallet_addr = "kaspatest:test".to_string();
+        handler.get_create_stats(&ctx);
 
         handler.get_create_stats(&ctx);
 
@@ -3120,6 +3146,8 @@ mod comprehensive_tests {
         // Note: set_client_vardiff stores the value as-is; clamping happens during VarDiff computation
         let handler = ShareHandler::new("test-instance".to_string());
         let ctx = create_test_context_sync();
+        ctx.identity.lock().wallet_addr = "kaspatest:test".to_string();
+        handler.get_create_stats(&ctx);
 
         handler.get_create_stats(&ctx);
 
@@ -3161,6 +3189,8 @@ mod comprehensive_tests {
         // Test: Scenarios where VarDiff should not change
         let handler = ShareHandler::new("test-instance".to_string());
         let ctx = create_test_context_sync();
+        ctx.identity.lock().wallet_addr = "kaspatest:test".to_string();
+        handler.get_create_stats(&ctx);
 
         handler.get_create_stats(&ctx);
 

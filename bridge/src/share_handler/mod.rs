@@ -6,6 +6,7 @@ mod vardiff;
 mod work_stats;
 
 pub use kaspa_api_trait::KaspaApiTrait;
+pub use lifecycle::average_worker_spm;
 pub use submit::{SubmitError, SubmitRunError};
 #[cfg(feature = "rkstratum_cpu_miner")]
 pub use work_stats::{RKSTRATUM_CPU_MINER_METRICS, set_rkstratum_cpu_miner_metrics};
@@ -28,5 +29,16 @@ pub struct ShareHandler {
 impl ShareHandler {
     pub fn log_prefix(&self) -> String {
         format!("[{}]", self.instance_id)
+    }
+}
+
+#[cfg(test)]
+impl ShareHandler {
+    pub(crate) fn test_stats_len(&self) -> usize {
+        self.stats.lock().len()
+    }
+
+    pub(crate) fn test_clear_stats(&self) {
+        self.stats.lock().clear();
     }
 }

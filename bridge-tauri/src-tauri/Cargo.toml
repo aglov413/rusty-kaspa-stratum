@@ -6,7 +6,7 @@ authors = ["Kaspa developers"]
 license = "ISC"
 repository = "https://github.com/LiveLaughLove13/rusty-kaspa-stratum"
 edition = "2021"
-rust-version = "1.88.0"
+rust-version = "1.91.0"
 
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }
@@ -17,7 +17,7 @@ serde = { version = "1.0.107", features = ["derive"] }
 serde_json = "1.0.107"
 tauri = { version = "1.5", features = ["api-all", "custom-protocol"] }
 kaspa-stratum-bridge = { path = "../../bridge", default-features = true }
-kaspa-alloc = { git = "https://github.com/kaspanet/rusty-kaspa.git", branch = "master" }
+kaspa-alloc = { workspace = true }
 tokio = { version = "1.33.0", features = ["rt-multi-thread", "macros"] }
 clap = { version = "4.5.35", features = ["derive"] }
 

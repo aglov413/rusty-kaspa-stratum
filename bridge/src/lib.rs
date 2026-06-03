@@ -119,11 +119,15 @@ pub use rkstratum_cpu_miner::{
 };
 pub use share_handler::{
     KaspaApiTrait, STATS_PRINTER_STARTED, ShareHandler, SubmitError, SubmitRunError, WorkStats,
+    average_worker_spm,
 };
 #[cfg(feature = "rkstratum_cpu_miner")]
 pub use share_handler::{RKSTRATUM_CPU_MINER_METRICS, set_rkstratum_cpu_miner_metrics};
 pub use stratum_context::{ClientIdentity, ContextSummary, ErrorDisconnected, StratumContext};
-pub use stratum_line_codec::{line_looks_like_http, push_lossy_and_drain_lines, strip_nul_bytes};
+pub use stratum_line_codec::{
+    MAX_STRATUM_LINE_BYTES, append_line_data, line_looks_like_http, push_lossy_and_drain_lines,
+    strip_nul_bytes,
+};
 pub use stratum_listener::{
     EventHandler, StateGenerator, StratumClientListener, StratumListener, StratumListenerConfig,
     StratumStats,
