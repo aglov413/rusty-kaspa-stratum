@@ -347,7 +347,6 @@ impl ShareHandler {
                 let mut total_invalids: i64 = 0;
                 let mut total_blocks: i64 = 0;
                 let mut total_blocks_all_time: i64 = 0;
-                let mut active_worker_count: usize = 0;
 
                 let now = Instant::now();
                 let start = entries
@@ -390,7 +389,6 @@ impl ShareHandler {
 
                         // Sum blocks from individual workers for "Blocks" column (online workers only)
                         total_blocks += blocks;
-                        active_worker_count += 1;
 
                         let spm = if elapsed > 0.0 {
                             (shares as f64) / (elapsed / 60.0)
