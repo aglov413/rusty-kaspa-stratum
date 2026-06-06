@@ -6,7 +6,7 @@ default-members = ["bridge"]
 
 [workspace.package]
 rust-version = "1.91.0"
-version = "1.3.0-toc.5"
+version = "2.0.0"
 authors = ["Kaspa developers"]
 license = "ISC"
 repository = "https://github.com/LiveLaughLove13/rusty-kaspa-stratum"
