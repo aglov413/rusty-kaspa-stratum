@@ -20,6 +20,12 @@ use crate::kaspaapi::node_status_for_api;
 use crate::net_utils::bind_addr_for_operator_http;
 use serde::Serialize;
 use std::net::SocketAddr;
+use std::time::Duration;
+use tokio::time::timeout;
+
+/// Max time to wait for a client to send an HTTP request after connecting.
+const READ_TIMEOUT: Duration = Duration::from_secs(10);
+
 #[derive(Serialize)]
 struct WebStatusResponse {
     kaspad_address: String,
@@ -49,14 +55,14 @@ pub(crate) enum HttpMode {
 
 fn json_ok_headers(content_len: usize) -> String {
     format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n",
         content_len
     )
 }
 
 fn json_forbidden_headers(content_len: usize) -> String {
     format!(
-        "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n",
+        "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n",
         content_len
     )
 }
@@ -70,7 +76,7 @@ fn json_deny_response(deny: ConfigRouteDeny) -> String {
         _ => "403 Forbidden",
     };
     format!(
-        "HTTP/1.1 {}\r\nContent-Type: application/json\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
+        "HTTP/1.1 {}\r\nContent-Type: application/json\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
         status,
         body.len(),
         body
@@ -87,17 +93,26 @@ async fn write_response(
     if let Some(body) = body_bytes {
         stream.write_all(&body).await?;
     }
+    let _ = stream.shutdown().await;
+    Ok(())
+}
+
+async fn send_response(
+    mut stream: tokio::net::TcpStream,
+    response: impl AsRef<[u8]>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use tokio::io::AsyncWriteExt;
+    stream.write_all(response.as_ref()).await?;
+    let _ = stream.shutdown().await;
     Ok(())
 }
 
 pub(crate) async fn handle_http_request(
-    mut stream: tokio::net::TcpStream,
+    stream: tokio::net::TcpStream,
     request: &str,
     mode: &HttpMode,
     peer: SocketAddr,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use tokio::io::AsyncWriteExt;
-
     let path = request
         .lines()
         .next()
@@ -119,11 +134,11 @@ pub(crate) async fn handle_http_request(
         encoder.encode(&metric_families, &mut buf)?;
 
         let response = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4\r\nX-Content-Type-Options: nosniff\r\nContent-Length: {}\r\n\r\n{}",
+            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nContent-Length: {}\r\n\r\n{}",
             buf.len(),
             String::from_utf8_lossy(&buf)
         );
-        stream.write_all(response.as_bytes()).await?;
+        send_response(stream, response).await?;
         return Ok(());
     }
 
@@ -152,7 +167,7 @@ pub(crate) async fn handle_http_request(
         };
         let json = serde_json::to_string(&status).unwrap_or_else(|_| "{}".to_string());
         let response = format!("{}{}", json_ok_headers(json.len()), json);
-        stream.write_all(response.as_bytes()).await?;
+        send_response(stream, response).await?;
         return Ok(());
     }
 
@@ -162,7 +177,7 @@ pub(crate) async fn handle_http_request(
             None => r#"{"available":false,"message":"Host metrics disabled (minimal build: omit --no-default-features or add --features rkstratum_host_metrics) or not yet collected"}"#.to_string(),
         };
         let response = format!("{}{}", json_ok_headers(body.len()), body);
-        stream.write_all(response.as_bytes()).await?;
+        send_response(stream, response).await?;
         return Ok(());
     }
 
@@ -173,26 +188,26 @@ pub(crate) async fn handle_http_request(
         };
         let json = serde_json::to_string(&stats).unwrap_or_else(|_| "{}".to_string());
         let response = format!("{}{}", json_ok_headers(json.len()), json);
-        stream.write_all(response.as_bytes()).await?;
+        send_response(stream, response).await?;
         return Ok(());
     }
 
     if matches!(mode, HttpMode::Instance { .. }) && request.starts_with("GET /api/config") {
         if let Err(deny) = check_config_route_access(request, peer.ip(), false) {
             let response = json_deny_response(deny);
-            stream.write_all(response.as_bytes()).await?;
+            send_response(stream, response).await?;
             return Ok(());
         }
         let config_json = get_config_json().await;
         let response = format!("{}{}", json_ok_headers(config_json.len()), config_json);
-        stream.write_all(response.as_bytes()).await?;
+        send_response(stream, response).await?;
         return Ok(());
     }
 
     if matches!(mode, HttpMode::Instance { .. }) && request.starts_with("POST /api/config") {
         if let Err(deny) = check_config_route_access(request, peer.ip(), true) {
             let response = json_deny_response(deny);
-            stream.write_all(response.as_bytes()).await?;
+            send_response(stream, response).await?;
             return Ok(());
         }
         if !config_write_allowed() {
@@ -202,7 +217,7 @@ pub(crate) async fn handle_http_request(
                 json_forbidden_headers(json_response.len()),
                 json_response
             );
-            stream.write_all(response.as_bytes()).await?;
+            send_response(stream, response).await?;
             return Ok(());
         }
 
@@ -215,7 +230,7 @@ pub(crate) async fn handle_http_request(
             r#"{"success": false, "message": "Failed to update config"}"#
         };
         let response = format!("{}{}", json_ok_headers(json_response.len()), json_response);
-        stream.write_all(response.as_bytes()).await?;
+        send_response(stream, response).await?;
         return Ok(());
     }
 
@@ -223,22 +238,60 @@ pub(crate) async fn handle_http_request(
         if let Some((rel, bytes)) = try_read_static_file(path) {
             let ct = content_type_for_path(&rel);
             let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
+                "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nConnection: close\r\nContent-Length: {}\r\n\r\n",
                 ct,
                 bytes.len()
             );
             write_response(stream, response, Some(bytes)).await?;
         } else {
-            stream
-                .write_all("HTTP/1.1 404 Not Found\r\n\r\n".as_bytes())
-                .await?;
+            send_response(stream, "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n").await?;
         }
         return Ok(());
     }
 
-    stream
-        .write_all("HTTP/1.1 404 Not Found\r\n\r\n".as_bytes())
-        .await?;
+    send_response(stream, "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n").await?;
+    Ok(())
+}
+
+async fn handle_one_connection(
+    mut stream: tokio::net::TcpStream,
+    peer: SocketAddr,
+    mode: HttpMode,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use tokio::io::AsyncReadExt;
+
+    let started = std::time::Instant::now();
+    let mut buffer = [0u8; 8192];
+
+    match timeout(READ_TIMEOUT, stream.read(&mut buffer)).await {
+        Ok(Ok(0)) => return Ok(()),
+        Ok(Ok(n)) => {
+            let request = String::from_utf8_lossy(&buffer[..n]);
+            let path = request
+                .lines()
+                .next()
+                .and_then(|line| line.split_whitespace().nth(1))
+                .unwrap_or("/");
+            handle_http_request(stream, &request, &mode, peer).await?;
+            tracing::debug!(
+                "Dashboard {} from {} handled in {:?}",
+                path,
+                peer,
+                started.elapsed()
+            );
+        }
+        Ok(Err(e)) => {
+            tracing::debug!("Read error from {}: {}", peer, e);
+        }
+        Err(_) => {
+            tracing::debug!(
+                "Read timeout from {} after {:?} — closing stale connection",
+                peer,
+                READ_TIMEOUT
+            );
+        }
+    }
+
     Ok(())
 }
 
@@ -246,16 +299,22 @@ async fn serve_http_loop(
     listener: tokio::net::TcpListener,
     mode: HttpMode,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use tokio::io::AsyncReadExt;
-
     loop {
-        let (mut stream, peer) = listener.accept().await?;
-        let mut buffer = [0; 8192];
+        let (stream, peer) = match listener.accept().await {
+            Ok(conn) => conn,
+            Err(e) => {
+                tracing::warn!("TCP accept error on web dashboard: {}", e);
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                continue;
+            }
+        };
 
-        if let Ok(n) = stream.read(&mut buffer).await {
-            let request = String::from_utf8_lossy(&buffer[..n]);
-            let _ = handle_http_request(stream, &request, &mode, peer).await;
-        }
+        let mode = mode.clone();
+        tokio::spawn(async move {
+            if let Err(e) = handle_one_connection(stream, peer, mode).await {
+                tracing::debug!("Dashboard connection from {} ended with: {}", peer, e);
+            }
+        });
     }
 }
 

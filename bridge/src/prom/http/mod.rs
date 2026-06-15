@@ -72,6 +72,7 @@ min_share_diff: 8192
 
         let status_resp = send_request(mode.clone(), "GET /api/status HTTP/1.1\r\n\r\n").await;
         assert!(status_resp.contains("200 OK"));
+        assert!(status_resp.contains("Connection: close"));
         assert!(status_resp.contains("\"kaspad_address\""));
         assert!(status_resp.contains("\"instances\":2"));
         assert!(status_resp.contains("\"host_metrics_enabled\""));
